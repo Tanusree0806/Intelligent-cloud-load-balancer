@@ -31,6 +31,8 @@ class StepResponse(BaseModel):
 
 class ResetRequest(BaseModel):
     task_type: str = "basic_load"
+    seed: Optional[int] = None
+    options: Optional[Dict[str, Any]] = None
 
 
 class ResetResponse(BaseModel):
@@ -50,6 +52,8 @@ class EvaluateRequest(BaseModel):
     actions: List[Action]
     observations: List[Observation]
     rewards: List[float]
+    seed: Optional[int] = None
+    options: Optional[Dict[str, Any]] = None
 
 
 class EvaluateResponse(BaseModel):
