@@ -5,7 +5,7 @@ FastAPI server for the Intelligent Cloud Load Balancer environment
 
 import os
 import sys
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
