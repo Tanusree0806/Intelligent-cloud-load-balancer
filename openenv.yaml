@@ -1,0 +1,115 @@
+# OpenEnv Configuration for Intelligent Cloud Load Balancer Environment
+
+name: "intelligent-cloud-load-balancer"
+description: |
+  A realistic cloud load balancing simulation environment where agents must distribute 
+  incoming requests across multiple servers while optimizing for performance, cost, and reliability.
+  This environment simulates real-world challenges faced by cloud load balancers including 
+  server failures, priority routing, and dynamic load distribution.
+
+version: "1.0.0"
+author: "OpenEnv Contributor"
+license: "MIT"
+
+# Environment metadata
+environment:
+  type: "load_balancer"
+  domain: "cloud_computing"
+  complexity: "medium"
+  real_world_applicability: "high"
+
+# Task definitions
+tasks:
+  - name: "basic_load"
+    difficulty: "easy"
+    description: "Basic load balancing across healthy servers"
+    max_steps: 20
+    success_threshold: 0.6
+    
+  - name: "priority_routing"
+    difficulty: "medium"
+    description: "Handle requests with different priority levels"
+    max_steps: 25
+    success_threshold: 0.7
+    
+  - name: "failover_management"
+    difficulty: "hard"
+    description: "Maintain availability during server failures"
+    max_steps: 30
+    success_threshold: 0.8
+
+# Action and observation spaces
+action_space:
+  type: "structured"
+  description: "Assign request to specific server"
+  schema:
+    server_id: "string"
+    request_id: "string (optional)"
+
+observation_space:
+  type: "structured"
+  description: "Complete system state including servers and requests"
+  schema:
+    servers: "array of Server objects"
+    pending_requests: "array of Request objects"
+    current_step: "integer"
+    total_requests_processed: "integer"
+    average_response_time: "float"
+    total_cost: "float"
+    failed_requests: "integer"
+    task_type: "string"
+    task_progress: "float"
+
+# Reward structure
+reward_function:
+  type: "dense"
+  description: "Combines efficiency, cost, and task-specific metrics"
+  components:
+    - name: "load_balance"
+      weight: 0.3
+      description: "Reward for balanced server utilization"
+    - name: "success_rate"
+      weight: 0.3
+      description: "Reward for successful request processing"
+    - name: "cost_efficiency"
+      weight: 0.2
+      description: "Reward for minimizing operational costs"
+    - name: "task_specific"
+      weight: 0.2
+      description: "Task-specific performance metrics"
+
+# API configuration
+api:
+  protocol: "http"
+  endpoints:
+    reset: "/reset"
+    step: "/step"
+    state: "/state"
+    health: "/health"
+    tasks: "/tasks"
+    evaluate: "/evaluate"
+
+# Deployment requirements
+deployment:
+  requires_gpu: false
+  memory_requirement: "512MB"
+  cpu_requirement: "1 core"
+  disk_requirement: "100MB"
+  network_access: false
+
+# Dependencies
+dependencies:
+  python: ">=3.11"
+  packages:
+    - "fastapi>=0.104.0"
+    - "uvicorn[standard]>=0.24.0"
+    - "pydantic>=2.5.0"
+    - "aiohttp>=3.9.0"
+    - "openai>=1.3.0"
+
+# Validation requirements
+validation:
+  openenv_compatible: true
+  docker_compatible: true
+  huggingface_spaces_compatible: true
+  baseline_inference: true
