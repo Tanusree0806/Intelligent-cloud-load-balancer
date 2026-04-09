@@ -8,7 +8,6 @@ import os
 import json
 import sys
 from typing import List, Optional, Dict, Any
-from openai import OpenAI
 
 # Exactly as validator instructs
 API_BASE_URL = os.environ["API_BASE_URL"]
@@ -19,12 +18,6 @@ BENCHMARK = os.getenv("LOAD_BALANCER_BENCHMARK", "load_balancer")
 SERVER_URL = os.getenv("SERVER_URL", "https://tanusree08-intelligent-cloud-load-balancer.hf.space")
 MAX_STEPS = 10
 SUCCESS_SCORE_THRESHOLD = 0.6
-
-# Exactly as validator instructs
-client = OpenAI(
-    base_url=os.environ["API_BASE_URL"],
-    api_key=os.environ["API_KEY"],
-)
 
 SYSTEM_PROMPT = """You are a cloud load balancer agent. Distribute requests across servers optimally.
 Respond ONLY with JSON: {"server_id": "server_0", "reasoning": "reason"}
@@ -68,20 +61,71 @@ def make_observation_text(obs: Dict) -> str:
     return "\n".join(lines)
 
 
-def call_llm(step: int, obs_text: str) -> str:
-    """Call LLM through validator proxy - no try/except so errors are visible"""
-    completion = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
+def call_llm_requests(step: int, obs_text: str) -> str:
+    """Call LLM using raw requests — works with ANY openai version"""
+    import urllib.request
+    import urllib.error
+
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Step {step}. Current state:\n{obs_text}\nWhich server to use?"},
+            {"role": "user", "content": f"Step {step}. Current state:\n{obs_text}\nWhich server?"},
         ],
-        max_tokens=100,
-        temperature=0.7,
+        "max_tokens": 100,
+        "temperature": 0.7,
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    url = API_BASE_URL.rstrip("/") + "/chat/completions"
+
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_KEY}",
+        },
+        method="POST",
     )
-    response = (completion.choices[0].message.content or "").strip()
-    print(f"[DEBUG] Step {step} LLM response: {response}", flush=True)
-    return response
+
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        result = json.loads(resp.read().decode("utf-8"))
+        response = result["choices"][0]["message"]["content"].strip()
+        print(f"[DEBUG] Step {step} LLM response: {response}", flush=True)
+        return response
+
+
+def call_llm(step: int, obs_text: str) -> str:
+    """Try openai client first, fall back to raw requests"""
+    # First try raw HTTP request (most compatible)
+    try:
+        return call_llm_requests(step, obs_text)
+    except Exception as e:
+        print(f"[DEBUG] Raw request failed: {e}", flush=True)
+
+    # Fallback: try openai client
+    try:
+        from openai import OpenAI
+        client = OpenAI(
+            base_url=API_BASE_URL,
+            api_key=API_KEY,
+        )
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"Step {step}. Current state:\n{obs_text}\nWhich server?"},
+            ],
+            max_tokens=100,
+            temperature=0.7,
+        )
+        response = (completion.choices[0].message.content or "").strip()
+        print(f"[DEBUG] Step {step} OpenAI client response: {response}", flush=True)
+        return response
+    except Exception as e:
+        print(f"[DEBUG] OpenAI client failed: {e}", flush=True)
+        raise
 
 
 async def main() -> None:
@@ -101,7 +145,7 @@ async def main() -> None:
         observation = SIMULATED_OBS.copy()
         server_available = False
 
-        # Try to reach live environment server
+        # Try to reach live environment
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
@@ -137,7 +181,7 @@ async def main() -> None:
 
                 obs_text = make_observation_text(observation)
 
-                # LLM call through validator's proxy - always happens
+                # LLM call through validator proxy - always happens
                 response_text = call_llm(step, obs_text)
 
                 try:
